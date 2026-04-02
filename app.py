@@ -2,6 +2,7 @@ import streamlit as st
 import pymssql
 import pandas as pd
 import os
+import time
 
 # =============================================
 # 1. DATABASE CONFIGURATION (VIA ENVIRONMENT)
@@ -13,28 +14,38 @@ USERNAME = os.getenv("DB_USER")
 PASSWORD = os.getenv("DB_PASSWORD")
 
 def get_data():
-    """Fetches data from Azure SQL and returns a DataFrame."""
+    """Fetches data with retry logic for Serverless Azure SQL wake-up."""
     if not all([SERVER, DATABASE, USERNAME, PASSWORD]):
-        st.error("Missing Environment Variables: DB_SERVER, DB_NAME, DB_USER, or DB_PASS.")
+        st.error("Missing Environment Variables.")
         return None
         
-    conn = None
-    try:
-        # Connect using pymssql
-        conn = pymssql.connect(SERVER, USERNAME, PASSWORD, DATABASE)
-        
-        # SQL Query to pull your food data
-        query = "SELECT name, category, average_price, lat, lng, tags_json FROM dbo.FoodPlaces"
-        
-        # Read directly into Pandas
-        df = pd.read_sql(query, conn)
-        return df
-    except Exception as e:
-        st.error(f"Database Connection Error: {e}")
-        return None
-    finally:
-        if conn:
-            conn.close()
+    max_retries = 3
+    retry_delay = 20  # Seconds to wait for Azure SQL to resume
+    
+    for attempt in range(max_retries):
+        conn = None
+        try:
+            # Connect to Azure SQL
+            conn = pymssql.connect(SERVER, USERNAME, PASSWORD, DATABASE)
+            query = "SELECT name, category, average_price, lat, lng, tags_json FROM dbo.FoodPlaces"
+            
+            # Use pandas to read the table
+            df = pd.read_sql(query, conn)
+            return df
+
+        except Exception as e:
+            error_msg = str(e)
+            # If the error is the 40613 "Database not available"
+            if "40613" in error_msg and attempt < max_retries - 1:
+                with st.spinner(f"😴 Azure SQL is waking up... Please wait ({attempt + 1}/{max_retries})"):
+                    time.sleep(retry_delay)
+            else:
+                st.error(f"❌ Database Error: {e}")
+                return None
+        finally:
+            if conn:
+                conn.close()
+    return None
 
 # =============================================
 # 2. WEB INTERFACE
