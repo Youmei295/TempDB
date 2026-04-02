@@ -27,7 +27,7 @@ def get_data():
         try:
             # Connect to Azure SQL
             conn = pymssql.connect(SERVER, USERNAME, PASSWORD, DATABASE)
-            query = "SELECT name, category, average_price, lat, lng, tags_json FROM dbo.FoodPlaces"
+            query = "SELECT name, category, average_price, rating, lat, lng, tags_json FROM dbo.FoodPlaces"
             
             # Use pandas to read the table
             df = pd.read_sql(query, conn)
