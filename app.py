@@ -67,4 +67,4 @@ if df is not None:
         mime='text/csv',
     )
 else:
-    st.info("No data found or connection could not be established."
+    st.info("No data found or connection could not be established.")
